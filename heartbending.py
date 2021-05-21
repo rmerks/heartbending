@@ -726,11 +726,11 @@ def makePlots(datalists):
 
     plot_source_data['figure 4 angular velocity'] = mt_VA
 
-    ############
-    # Figure 9 #
-    ############
+    ####################
+    # Figure 4 - Twist #
+    ####################
 
-    # Figure 9: total twist
+    # Figure 4: total twist
     fig_twist = plt.figure(figsize=(16,8)) 
     tw1 = fig_twist.add_subplot(131) # total twist fit over time
     tw2 = fig_twist.add_subplot(132) # point swarm twist velocity used for statistical test
@@ -977,7 +977,7 @@ print()
 #######################################
 
 # Command line input example:
-# python3 heartbending_timelapse_fold-axis_printmovies.py ./Data/time-lapse/ ./Data/start-end/ "*wt*" "*oug*"
+# python3 heartbending.py ./Data/time-lapse/ ./Data/start-end/ "*wt*" "*oug*"
 
 # Check if command line arguments are given
 if len(sys.argv) < 1:
