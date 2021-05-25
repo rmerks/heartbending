@@ -751,7 +751,7 @@ def makePlots(datalists):
                         data = fit_twist_nr, palette=cdict,
                         ax = tw1, linewidth = 4, alpha = 0.5)
 
-    plot_source_data['figure 9 twist'] = fit_twist_nr[['ec','replicate', 'time_intervals', 'twisting angle']]
+    plot_source_data['figure 4 twist'] = fit_twist_nr[['ec','replicate', 'time_intervals', 'twisting angle']]
 
     # Total twisting angle after 9 hours
     order = ["wt", "oug"]
@@ -775,7 +775,7 @@ def makePlots(datalists):
     for elem, xtick in zip(order, g.get_xticks()):
         tw2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
     
-    plot_source_data['figure 9 mean total twist after 9 hours'] = df_after9
+    plot_source_data['figure 4 mean total twist after 9 hours'] = df_after9
 
     # Twist velocity wt vs oug
     order = ["wt", "oug"]
@@ -806,7 +806,7 @@ def makePlots(datalists):
     for elem, xtick in zip(order, g.get_xticks()):
         tw3.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
 
-    plot_source_data['figure 9 twist velocity'] = df_test_twist
+    plot_source_data['figure 4 twist velocity'] = df_test_twist
     
     ##############
     # Supplement #
@@ -977,15 +977,15 @@ print()
 #######################################
 
 # Command line input example:
-# python3 heartbending.py ./Data/time-lapse/ ./Data/start-end/ "*wt*" "*oug*"
+# python3 heartbending.py ./excel_set_1/ ./excel_set_2/ "*wt*" "*oug*"
 
 # Check if command line arguments are given
 if len(sys.argv) < 1:
     sys.stderr.write("Error. I need at least one path/to/file and a string to match the filename\n")
     sys.exit(1)
 
-filepath_tl = sys.argv[1] # time-lapse
-filepath_se = sys.argv[2] # start-end
+filepath_tl = sys.argv[1] # positions of the tracks throughout the timelapse
+filepath_se = sys.argv[2] # start and end positions of each cell track as well as heart segment categories
 exp_cond    = sys.argv[3:] # Experimental conditions, e.g. "wt" and "oug"
 
 
@@ -1185,7 +1185,7 @@ for ec_idx, ec in enumerate(exp_cond):
         avc_cents = avc.groupby(['Time'])[xyz].mean().reset_index()
         reference = avc_cents.loc[avc_cents['Time'] == mint][xyz].to_numpy()
 
-        # df_twisttract the reference from ALL points at all times
+        # Subtract the reference from ALL points at all times
         idx = df[xyz].index
         A = df[xyz].to_numpy()
         B = np.tile( reference, (len(df[xyz]),1) )
@@ -1201,7 +1201,7 @@ for ec_idx, ec in enumerate(exp_cond):
 
         df = pd.merge(df, avc_cents, left_on='Time', right_on='Time')
         
-        # df_twisttract the AVC centroid at time t from all points in time t
+        # Subtract the AVC centroid at time t from all points in time t
         idx = df[xyzC].index
         A = df[xyzC].to_numpy()
         B = df[avcC].to_numpy()
