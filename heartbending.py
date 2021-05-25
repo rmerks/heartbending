@@ -462,7 +462,7 @@ def plot_frames(df_all_data):
                     fontItems += ax.get_xticklabels() + ax.get_yticklabels() + ax.get_zticklabels()
                     try:
                         fontItems += ax.get_legend().get_texts()
-                    except AttributeError: # no legend
+                    except Exception: # no legend
                         pass
                     for item in fontItems:
                         item.set_fontsize(20)
@@ -556,7 +556,7 @@ def adjustPlotAesthetics(ax, ylab = False):
         fontItems += axis.get_xticklabels() + axis.get_yticklabels()
         try:
             fontItems += axis.get_legend().get_texts()
-        except AttributeError: # no legend
+        except Exception: # no legend
             pass
         for item in fontItems:
             item.set_fontsize(12)
@@ -587,10 +587,6 @@ def makePlots(datalists):
 
     plot_source_data = {}
 
-    # For swarmplot coloring
-    hue = 'timerep' # 'Cat'  # 'timerep'
-    hue2 = 'ecrep' # 'ec', 'ecrep'
-    hue3 = 'ectime' # 'ec', 'ecrep', 'ectime'
 
     ############
     # Figure 2 #
@@ -601,63 +597,60 @@ def makePlots(datalists):
     ax_wt_1 = fig_angvel_wt.add_subplot(121) # total rotation atrium vs ventricle
     ax_wt_2 = fig_angvel_wt.add_subplot(122) # point swarm average angular velocity per interval
 
-    # Total rotation
-    df_totrot = result_totrot.loc[result_totrot['ec']=='wt']
-    plot_lines(df_totrot.loc[df_totrot['Cat']=='V'], ax_wt_1 , y = 'total_rotation', pal = 'PuRd')
-    plot_lines(df_totrot.loc[df_totrot['Cat']=='A'], ax_wt_1 , y = 'total_rotation', pal = 'PuBu')
+    try:
+        # Total rotation
+        df_totrot = result_totrot.loc[result_totrot['ec']=='wt']
+        plot_lines(df_totrot.loc[df_totrot['Cat']=='V'], ax_wt_1 , y = 'total_rotation', pal = 'PuRd')
+        plot_lines(df_totrot.loc[df_totrot['Cat']=='A'], ax_wt_1 , y = 'total_rotation', pal = 'PuBu')
 
-    # Add custom legends to plot
-    first_legend = ax_wt_1.get_legend()
-    ax_wt_1.add_artist(first_legend)
+        # Add custom legends to plot
+        first_legend = ax_wt_1.get_legend()
+        ax_wt_1.add_artist(first_legend)
 
-    names = ['ventricle', 'atrium']
-    pal  = sns.color_palette('PuRd', 1)
-    pal += sns.color_palette('PuBu', 1)
-    cdict = dict(zip(names, pal))
+        names = ['ventricle', 'atrium']
+        pal  = sns.color_palette('PuRd', 1)
+        pal += sns.color_palette('PuBu', 1)
+        cdict = dict(zip(names, pal))
 
-    custom_lines = []
-    custom_legs = []
-    for k, v in cdict.items():
-        custom_lines.append(Line2D([0],[0], color=v, lw=4))
-        custom_legs.append(k)
+        custom_lines = []
+        custom_legs = []
+        for k, v in cdict.items():
+            custom_lines.append(Line2D([0],[0], color=v, lw=4))
+            custom_legs.append(k)
 
-    # Create another legend
-    ax_wt_1.legend(custom_lines, custom_legs, title="chamber", fontsize=4, loc='lower center')
+        # Create another legend
+        ax_wt_1.legend(custom_lines, custom_legs, title="chamber", fontsize=4, loc='lower center')
 
-    df_totrot_VA = df_totrot.drop(df_totrot[df_totrot['Cat'] == 'AVC'].index)
-    plot_source_data['figure 2 total rotation'] = df_totrot_VA[['ec', 'replicate', 'Cat', 'time_hr', 'total_rotation']]
+        df_totrot_VA = df_totrot.drop(df_totrot[df_totrot['Cat'] == 'AVC'].index)
+        plot_source_data['figure 2 total rotation'] = df_totrot_VA[['ec', 'replicate', 'Cat', 'time_hr', 'total_rotation']]
+    except Exception:
+        print()
+        print("An error occurred. Dataset may be empty.")
+        print("Skipping 'figure 2 total rotation wt'")
+        print()
 
     # Swarmplot angular velocity
-    wt = df_test_totrot.loc[df_test_totrot['ec'] == 'wt']
-    wt_VA = wt.loc[wt['Cat'].isin(['V', 'A'])]
+    try:
+        wt = df_test_totrot.loc[df_test_totrot['ec'] == 'wt']
+        wt_VA = wt.loc[wt['Cat'].isin(['V', 'A'])]
 
-    order = ["wtV", "wtA"] 
-    if hue == 'Cat':
+        order = ["wtV", "wtA"] 
         names = ['V', 'A']
         pal  = sns.color_palette('PuRd', 1)
         pal += sns.color_palette('PuBu', 1)
         cdict = dict(zip(names, pal))
-    elif hue == 'catrep':
-        names = list(wt_VA['catrep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        items = int(len(names)/2)
-        pal  = sns.color_palette('PuRd', items)
-        pal += sns.color_palette('PuBu', items)
-        cdict = dict(zip(names, pal))
-    elif hue == 'timerep':
-        names = list(wt_VA['timerep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        items = int(len(names)/2)
-        pal  = sns.color_palette('PuRd', items)
-        pal += sns.color_palette('PuBu', items)
-        cdict = dict(zip(names, pal))
 
-    g = sns.swarmplot(x = 'group', y = 'angvel', data = wt_VA, ax = ax_wt_2, palette = cdict, hue = hue, order=order)
-    means = df_test_totrot.groupby(['group'])['angvel'].mean()
-    for elem, xtick in zip(order, g.get_xticks()):
-        ax_wt_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
+        g = sns.swarmplot(x = 'group', y = 'angvel', data = wt_VA, ax = ax_wt_2, palette = cdict, hue = 'Cat', order=order)
+        means = df_test_totrot.groupby(['group'])['angvel'].mean()
+        for elem, xtick in zip(order, g.get_xticks()):
+            ax_wt_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
 
-    plot_source_data['figure 2 angular velocity'] = wt_VA
+        plot_source_data['figure 2 angular velocity'] = wt_VA
+    except Exception:
+        print()
+        print("An error occurred. Dataset may be empty.")
+        print("Skipping 'figure 2 angular velocity wt'")
+        print()
 
     ############
     # Figure 4 #
@@ -668,68 +661,65 @@ def makePlots(datalists):
     ax_mt_1 = fig_angvel_mt.add_subplot(121) # total rotation atrium vs ventricle
     ax_mt_2 = fig_angvel_mt.add_subplot(122) # point swarm average angular velocity per interval
 
-    # Total rotation
-    df_totrot = result_totrot.loc[result_totrot['ec']=='oug']
-    plot_lines(df_totrot.loc[df_totrot['Cat']=='V'], ax_mt_1 , y = 'total_rotation', pal = 'PuRd')
-    plot_lines(df_totrot.loc[df_totrot['Cat']=='A'], ax_mt_1 , y = 'total_rotation', pal = 'PuBu')
+    try:
+        # Total rotation
+        df_totrot = result_totrot.loc[result_totrot['ec']=='oug']
+        plot_lines(df_totrot.loc[df_totrot['Cat']=='V'], ax_mt_1 , y = 'total_rotation', pal = 'PuRd')
+        plot_lines(df_totrot.loc[df_totrot['Cat']=='A'], ax_mt_1 , y = 'total_rotation', pal = 'PuBu')
 
-    # Add custom legends to plot
-    first_legend = ax_mt_1.get_legend()
-    ax_mt_1.add_artist(first_legend)
+        # Add custom legends to plot
+        first_legend = ax_mt_1.get_legend()
+        ax_mt_1.add_artist(first_legend)
 
-    names = ['ventricle', 'atrium']
-    pal  = sns.color_palette('PuRd', 1)
-    pal += sns.color_palette('PuBu', 1)
-    cdict = dict(zip(names, pal))
+        names = ['ventricle', 'atrium']
+        pal  = sns.color_palette('PuRd', 1)
+        pal += sns.color_palette('PuBu', 1)
+        cdict = dict(zip(names, pal))
 
-    custom_lines = []
-    custom_legs = []
-    for k, v in cdict.items():
-        custom_lines.append(Line2D([0],[0], color=v, lw=4))
-        custom_legs.append(k)
+        custom_lines = []
+        custom_legs = []
+        for k, v in cdict.items():
+            custom_lines.append(Line2D([0],[0], color=v, lw=4))
+            custom_legs.append(k)
 
-    # Create another legend
-    ax_mt_1.legend(custom_lines, custom_legs, title="chamber", fontsize=4, loc='lower center')
+        # Create another legend
+        ax_mt_1.legend(custom_lines, custom_legs, title="chamber", fontsize=4, loc='lower center')
 
-    df_totrot_VA = df_totrot.drop(df_totrot[df_totrot['Cat'] == 'AVC'].index)
-    plot_source_data['figure 4 total rotation'] = df_totrot_VA[['ec', 'replicate', 'Cat', 'time_hr', 'total_rotation']]
+        df_totrot_VA = df_totrot.drop(df_totrot[df_totrot['Cat'] == 'AVC'].index)
+        plot_source_data['figure 4 total rotation'] = df_totrot_VA[['ec', 'replicate', 'Cat', 'time_hr', 'total_rotation']]
+    except Exception:
+        print()
+        print("An error occurred. Dataset may be empty.")
+        print("Skipping 'figure 4 total rotation oug'")
+        print()
 
     # Swarmplot angular velocity
-    mt = df_test_totrot.loc[df_test_totrot['ec'] == 'oug']
-    mt_VA = mt.loc[mt['Cat'].isin(['V', 'A'])]
+    try:
+        mt = df_test_totrot.loc[df_test_totrot['ec'] == 'oug']
+        mt_VA = mt.loc[mt['Cat'].isin(['V', 'A'])]
 
-    order = ["ougV", "ougA"] 
-    if hue == 'Cat':
+        order = ["ougV", "ougA"] 
         names = ['V', 'A']
         pal  = sns.color_palette('PuRd', 1)
         pal += sns.color_palette('PuBu', 1)
         cdict = dict(zip(names, pal))
-    elif hue == 'catrep':
-        names = list(mt_VA['catrep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        items = int(len(names)/2)
-        pal  = sns.color_palette('PuRd', items)
-        pal += sns.color_palette('PuBu', items)
-        cdict = dict(zip(names, pal))
-    elif hue == 'timerep':
-        names = list(mt_VA['timerep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        items = int(len(names)/2)
-        pal  = sns.color_palette('PuRd', items)
-        pal += sns.color_palette('PuBu', items)
-        cdict = dict(zip(names, pal))
 
-    g = sns.swarmplot(x = 'group', y = 'angvel', data = mt_VA, ax = ax_mt_2, palette = cdict, hue = hue, order=order)
-    means = df_test_totrot.groupby(['group'])['angvel'].mean()
-    for elem, xtick in zip(order, g.get_xticks()):
-        ax_mt_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
+        g = sns.swarmplot(x = 'group', y = 'angvel', data = mt_VA, ax = ax_mt_2, palette = cdict, hue = 'Cat', order=order)
+        means = df_test_totrot.groupby(['group'])['angvel'].mean()
+        for elem, xtick in zip(order, g.get_xticks()):
+            ax_mt_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
 
-    plot_source_data['figure 4 angular velocity'] = mt_VA
+        plot_source_data['figure 4 angular velocity'] = mt_VA
+    except Exception:
+        print()
+        print("An error occurred. Dataset may be empty.")
+        print("Skipping 'figure 4 angular velocity oug'")
+        print()
 
     ####################
     # Figure 4 - Twist #
     ####################
-
+    
     # Figure 4: total twist
     fig_twist = plt.figure(figsize=(16,8)) 
     tw1 = fig_twist.add_subplot(131) # total twist fit over time
@@ -742,71 +732,54 @@ def makePlots(datalists):
     tw2.set_title("Average twist after 9 hours")
     tw3.set_title("Average twist velocity")
 
-    # Fit twist narrow intervals
-    names = ["wt", "oug"]
-    pal  = sns.color_palette('Blues', 1)
-    pal += sns.color_palette('Oranges', 1)
-    cdict = dict(zip(names, pal))
-    g = sns.lineplot(x = 'time_intervals', y = 'twisting angle', hue = 'ec', ci = 'sd',
-                        data = fit_twist_nr, palette=cdict,
-                        ax = tw1, linewidth = 4, alpha = 0.5)
+    try:
+        # Fit twist narrow intervals
+        names = ["wt", "oug"]
+        pal  = sns.color_palette('Blues', 1)
+        pal += sns.color_palette('Oranges', 1)
+        cdict = dict(zip(names, pal))
+        g = sns.lineplot(x = 'time_intervals', y = 'twisting angle', hue = 'ec', ci = 'sd',
+                            data = fit_twist_nr, palette=cdict,
+                            ax = tw1, linewidth = 4, alpha = 0.5)
 
-    plot_source_data['figure 4 twist'] = fit_twist_nr[['ec','replicate', 'time_intervals', 'twisting angle']]
+        plot_source_data['figure 4 twist'] = fit_twist_nr[['ec','replicate', 'time_intervals', 'twisting angle']]
 
-    # Total twisting angle after 9 hours
-    order = ["wt", "oug"]
+        # Total twisting angle after 9 hours
+        order = ["wt", "oug"]
 
-    if hue2 == 'ec':
         names = order
         pal  = sns.color_palette('Blues', 1)
         pal += sns.color_palette('Oranges', 1)
         cdict = dict(zip(names, pal))
-    elif hue2 == 'ecrep':
-        names = list(df_after9[hue2].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        items = int(len(names)/2)
-        pal  = sns.color_palette('Blues', items)
-        pal += sns.color_palette('Oranges', items)
-        cdict = dict(zip(names, pal))
 
-    g = sns.swarmplot(x = 'ec', y = 'mean total twist', data = df_after9, ax = tw2, palette = cdict, hue = hue2, order = order)
+        g = sns.swarmplot(x = 'ec', y = 'mean total twist', data = df_after9, ax = tw2, palette = cdict, hue = 'ec', order = order)
 
-    means = df_after9.groupby(['ec'], sort=False)['mean total twist'].mean()
-    for elem, xtick in zip(order, g.get_xticks()):
-        tw2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
-    
-    plot_source_data['figure 4 mean total twist after 9 hours'] = df_after9
+        means = df_after9.groupby(['ec'], sort=False)['mean total twist'].mean()
+        for elem, xtick in zip(order, g.get_xticks()):
+            tw2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
+        
+        plot_source_data['figure 4 mean total twist after 9 hours'] = df_after9
 
-    # Twist velocity wt vs oug
-    order = ["wt", "oug"]
+        # Twist velocity wt vs oug
+        order = ["wt", "oug"]
 
-    if hue3 == 'ec':
         names = order
         pal  = sns.color_palette('Blues', 1)
         pal += sns.color_palette('Oranges', 1)
         cdict = dict(zip(names, pal))
-    elif hue3 == 'ecrep':
-        names = list(df_test_twist['ecrep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        items = int(len(names)/2)
-        pal  = sns.color_palette('Blues', items)
-        pal += sns.color_palette('Oranges', items)
-        cdict = dict(zip(names, pal))
-    elif hue3 == 'ectime':
-        names = list(df_test_twist['ectime'].unique())
-        names = sorted(names, key=lambda x: x.split()[0], reverse=True)
-        items = int(len(names)/2)
-        pal  = sns.color_palette('Blues', items)
-        pal += sns.color_palette('Oranges', items)
-        cdict = dict(zip(names, pal))
 
-    g = sns.swarmplot(x = 'ec', y = 'angvel', data = df_test_twist, ax = tw3, palette = cdict, hue = hue3, order = order)
+        g = sns.swarmplot(x = 'ec', y = 'angvel', data = df_test_twist, ax = tw3, palette = cdict, hue = 'ec', order = order)
 
-    means = df_test_twist.groupby(['ec'], sort=False)['angvel'].mean()
-    for elem, xtick in zip(order, g.get_xticks()):
-        tw3.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
+        means = df_test_twist.groupby(['ec'], sort=False)['angvel'].mean()
+        for elem, xtick in zip(order, g.get_xticks()):
+            tw3.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
 
-    plot_source_data['figure 4 twist velocity'] = df_test_twist
+        plot_source_data['figure 4 twist velocity'] = df_test_twist
+    except Exception:
+        print()
+        print("An error occurred. One of the datasets may be empty.")
+        print("Skipping (part of) 'figure 4 twist plots'")
+        print()
     
     ##############
     # Supplement #
@@ -818,37 +791,32 @@ def makePlots(datalists):
     ax_avcw_1 = fig_avcw.add_subplot(121) # total rotation AVC
     ax_avcw_2 = fig_avcw.add_subplot(122) # point swarm average angular velocity per interval
 
-    # Total rotation
-    df_totrot = result_totrot.loc[result_totrot['ec']=='wt']
-    wt_AVC = wt.loc[wt['Cat'].isin(['AVC'])]
-    AVCdf = df_totrot[df_totrot['Cat']=='AVC']
-    plot_lines(AVCdf, ax_avcw_1 , y = 'total_rotation', pal = 'YlGn')
+    try:
+        # Total rotation
+        df_totrot = result_totrot.loc[result_totrot['ec']=='wt']
+        wt_AVC = wt.loc[wt['Cat'].isin(['AVC'])]
+        AVCdf = df_totrot[df_totrot['Cat']=='AVC']
+        plot_lines(AVCdf, ax_avcw_1 , y = 'total_rotation', pal = 'YlGn')
 
-    plot_source_data['supplement wildtype total rotation'] = AVCdf[['ec', 'replicate', 'Cat', 'total_rotation']]
-    
-    # Swarmplot angular velocity
-    order = ["wtAVC"] 
-    if hue == 'Cat':
+        plot_source_data['supplement wildtype total rotation'] = AVCdf[['ec', 'replicate', 'Cat', 'total_rotation']]
+        
+        # Swarmplot angular velocity
+        order = ["wtAVC"]
         names = ['AVC']
         pal = sns.color_palette('YlGn', 1)
         cdict = dict(zip(names, pal))
-    elif hue == 'catrep':
-        names = list(wt_AVC['catrep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        pal  = sns.color_palette('YlGn', items)
-        cdict = dict(zip(names, pal))
-    elif hue == 'timerep':
-        names = list(wt_AVC['timerep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        pal  = sns.color_palette('YlGn', items)
-        cdict = dict(zip(names, pal))
-        
-    means = wt_AVC.groupby(['group'])['angvel'].mean()
-    g = sns.swarmplot(x = 'group', y = 'angvel', data = wt_AVC, ax = ax_avcw_2, palette = cdict, hue = hue)
-    for elem, xtick in zip(order, g.get_xticks()):
-        ax_avcw_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
+            
+        means = wt_AVC.groupby(['group'])['angvel'].mean()
+        g = sns.swarmplot(x = 'group', y = 'angvel', data = wt_AVC, ax = ax_avcw_2, palette = cdict, hue = 'Cat')
+        for elem, xtick in zip(order, g.get_xticks()):
+            ax_avcw_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
 
-    plot_source_data['supplement wildtype angular velocity'] = wt_AVC
+        plot_source_data['supplement wildtype angular velocity'] = wt_AVC
+    except Exception:
+        print()
+        print("An error occurred. Datasets may be empty.")
+        print("Skipping 'supplementary plots wildtype'")
+        print()
     
     # MUTANT
     # Supplementary figure: AVC total rotation + average angular velocity MT
@@ -856,38 +824,33 @@ def makePlots(datalists):
     ax_avcm_1 = fig_avcm.add_subplot(121) # total rotation AVC
     ax_avcm_2 = fig_avcm.add_subplot(122) # point swarm average angular velocity per interval
 
-    # Total rotation
-    df_totrot = result_totrot.loc[result_totrot['ec']=='oug']
-    mt_AVC = mt.loc[mt['Cat'].isin(['AVC'])]
-    AVCdf = df_totrot[df_totrot['Cat']=='AVC']
-    plot_lines(AVCdf, ax_avcm_1 , y = 'total_rotation', pal = 'YlGn')
+    try:
+        # Total rotation
+        df_totrot = result_totrot.loc[result_totrot['ec']=='oug']
+        mt_AVC = mt.loc[mt['Cat'].isin(['AVC'])]
+        AVCdf = df_totrot[df_totrot['Cat']=='AVC']
+        plot_lines(AVCdf, ax_avcm_1 , y = 'total_rotation', pal = 'YlGn')
 
-    plot_source_data['supplement mutant total rotation'] = AVCdf[['ec', 'replicate', 'Cat', 'total_rotation']]
+        plot_source_data['supplement mutant total rotation'] = AVCdf[['ec', 'replicate', 'Cat', 'total_rotation']]
 
-    # Swarmplot angular velocity
-    order = ["ougAVC"] 
-    if hue == 'Cat':
+        # Swarmplot angular velocity
+        order = ["ougAVC"]
         names = ['AVC']
         pal = sns.color_palette('YlGn', 1)
         cdict = dict(zip(names, pal))
-    elif hue == 'catrep':
-        names = list(mt_AVC['catrep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        pal  = sns.color_palette('YlGn', items)
-        cdict = dict(zip(names, pal))
-    elif hue == 'timerep':
-        names = list(mt_AVC['timerep'].unique())
-        names = sorted(names, key=lambda x: x.split()[-1], reverse=True)
-        pal  = sns.color_palette('YlGn', items)
-        cdict = dict(zip(names, pal))
-        
-    means = mt_AVC.groupby(['group'])['angvel'].mean()
-    g = sns.swarmplot(x = 'group', y = 'angvel', data = mt_AVC, ax = ax_avcm_2, palette = cdict, hue = hue)
-    for elem, xtick in zip(order, g.get_xticks()):
-        ax_avcm_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
+            
+        means = mt_AVC.groupby(['group'])['angvel'].mean()
+        g = sns.swarmplot(x = 'group', y = 'angvel', data = mt_AVC, ax = ax_avcm_2, palette = cdict, hue = 'Cat')
+        for elem, xtick in zip(order, g.get_xticks()):
+            ax_avcm_2.plot([xtick-0.1, xtick+0.1], [means[elem], means[elem]], color='gray', linewidth='5')
 
-    plot_source_data['supplement mutant angular velocity'] = mt_AVC
-    
+        plot_source_data['supplement mutant angular velocity'] = mt_AVC    
+    except Exception:
+        print()
+        print("An error occurred. Dataset may be empty.")
+        print("Skipping 'supplementary plots oug'")
+        print()
+
     #############################
     # Make the plots consistent #
     #############################
