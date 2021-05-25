@@ -37,3 +37,12 @@ The code outputs the following:
 * csv files containing the source data as provided with the manuscript.
 * csv files containing the result of all statistical analyses as reported in the manuscript.
 * If `printmovies` option changed (see above): Individual frames used to create supplementary movies in the main manuscript in png format.
+
+## Required Python installation and packages ##
+The code runs in python 3 (tested with python 3.6 - 3.8) and requires the following additional modules:
+* Numpy
+* Pandas
+* Scipy
+* Matplotlib
+* Seaborn
+* statsmodels
