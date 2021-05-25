@@ -29,7 +29,7 @@ The filenames both contain the identifier "_wt4_". The code will map identical c
 4) Identifier for mutant condition filenames.
 
 ### Printing movie frames ###
-To print the frames of the supplementary movies, change the option `printmovies = False` to `printmovies = True` in [line 953](https://github.com/rmerks/heartbending/blob/fbbf742c7b4add5e6826c86dec85bb28dd6ac43c/heartbending.py#L953).
+To print the frames of the supplementary movies, change the option `printmovies = False` to `printmovies = True` in [line 953](https://github.com/rmerks/heartbending/blob/3c23926ec6a377fc9948f03ab24a5d073e5c44ac/heartbending.py#L953).
 
 ## Output format ##
 The code outputs the following:
