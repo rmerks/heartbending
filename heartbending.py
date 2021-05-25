@@ -1027,8 +1027,10 @@ for ec in inp_dict.keys():
 for ec_idx, ec in enumerate(exp_cond):
 
     if len(inp_dict[ec])==0:
-        sys.stderr.write("hearbending.py: Error. No files found for condition " + ec + "\n")
-        sys.exit(1)
+        sys.stderr.write("hearbending.py: Error. No files found for condition " + ec + "\n" + "\n")
+        exp_cond.remove(ec) # remove empty condition
+        continue
+        #sys.exit(1)
 
     plot_string = ''
     for dataset_number, dataset in enumerate(mapping[ec]):
