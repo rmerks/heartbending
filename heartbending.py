@@ -208,12 +208,42 @@ def doStats(datalists):
     wt_after9_mean = df_after9.loc[df_after9['ec'] == 'wt']
     oug_after9_mean = df_after9.loc[df_after9['ec'] == 'oug']
     after9_ttest = ttest_ind(wt_after9_mean['mean total twist'].tolist(), oug_after9_mean['mean total twist'].tolist(), equal_var=False)
+    after9_mww = stats.mannwhitneyu(wt_after9_mean['mean total twist'].tolist(), oug_after9_mean['mean total twist'].tolist())
 
     df_test_twist = datalists[6]
     wt = df_test_twist.loc[df_test_twist['ec'] == 'wt']
     mt = df_test_twist.loc[df_test_twist['ec'] == 'oug']
+    
+    # t-test
     result_ttest = ttest_ind(wt['angvel'].tolist(), mt['angvel'].tolist())
     twist_stats = ["twist velocity wt vs oug t-test p-value: ", result_ttest.pvalue]
+    
+    # mann-whitney/wilcoxon rank-sum test
+    result_mww = stats.mannwhitneyu(wt['angvel'].tolist(), mt['angvel'].tolist())
+    twist_mww = ["twist velocity wt vs oug mww-rank-sum-test p-value: ", result_mww.pvalue]
+
+    twist_normality_strings = [
+                    "wt total twist; Wilk-Shapiro normality (alpha=0.05);",
+                    "oug total twist; Wilk-Shapiro normality (alpha=0.05);",
+                    "wt twisting velocity; Wilk-Shapiro normality (alpha=0.05);",
+                    "oug twisting velocity; Wilk-Shapiro normality (alpha=0.05);"
+                 ]
+
+    list_datasets_twist = [
+                            wt_after9_mean['mean total twist'].tolist(),
+                            oug_after9_mean['mean total twist'].tolist(),
+                            wt['angvel'].tolist(),
+                            mt['angvel'].tolist()
+                          ]
+
+    # Test normality of distribution
+    for idx, i in enumerate(list_datasets_twist):
+        alpha = 0.05
+        k2, p =stats.shapiro(i)
+        if p < alpha:  # null hypothesis: x comes from a normal distribution
+            twist_normality_strings[idx] += "p-value; " + str(round(p,4)) + "; not normal"
+        else:
+            twist_normality_strings[idx] += "p-value; " + str(round(p,4)) + "; normal"
     
     df_test_totrot = datalists[7]
 
@@ -237,7 +267,26 @@ def doStats(datalists):
     mt_C = mt.loc[mt['Cat'] == 'AVC']['angvel'].tolist()
 
     # ANOVA
-    anovalist = [wt_V, wt_A, wt_C, mt_V, mt_A, mt_C]
+    anovalist = [wt_V, wt_A, wt_C, mt_V, mt_A, mt_C] # 2K, 4I, supplements 
+    
+    angvel_normality_strings = [
+                    "wt ventricle angular velocity; Wilk-Shapiro normality (alpha=0.05);",
+                    "wt atrium angular velocity; Wilk-Shapiro normality (alpha=0.05);",
+                    "wt AVC angular velocity; Wilk-Shapiro normality (alpha=0.05);",
+                    "oug ventricle angular velocity; Wilk-Shapiro normality (alpha=0.05);",
+                    "oug atrium angular velocity; Wilk-Shapiro normality (alpha=0.05);",
+                    "oug AVC angular velocity; Wilk-Shapiro normality (alpha=0.05);"
+                 ]
+
+    # Test normality of distribution
+    for idx, i in enumerate(anovalist):
+        alpha = 0.05
+        k2, p =stats.shapiro(i)
+        if p < alpha:  # null hypothesis: x comes from a normal distribution
+            angvel_normality_strings[idx] += "p-value; " + str(round(p,4)) + "; not normal"
+        else:
+            angvel_normality_strings[idx] += "p-value; " + str(round(p,4)) + "; normal"
+
     anova_F, anova_p = stats.f_oneway(*anovalist)
     anova = ["ANOVA F-value: ", anova_F, "ANOVA p-value: ", anova_p]
 
@@ -247,12 +296,19 @@ def doStats(datalists):
     pairings += [(wt_V, wt_C), (wt_A, wt_C), (wt_C, mt_C), (mt_V, mt_C), (mt_A, mt_C)]
     names += ['wt V vs wt AVC', 'wt A vs wt AVC', 'wt AVC vs oug AVC', 'oug V vs oug AVC', 'oug A vs oug AVC']
     ttest_res = []
+    mww_res = []
 
     for pair in pairings:
+        # t-test
         pairs_ttest = ttest_ind(pair[0], pair[1], equal_var=False)
         ttest_res.append(pairs_ttest.pvalue)
 
+        # mann-whitney/wilcoxon rank-sum test
+        result_mww = stats.mannwhitneyu(pair[0], pair[1])
+        mww_res.append(result_mww.pvalue)
+
     corr = multitest.multipletests(ttest_res, alpha=0.05, method='bonferroni', is_sorted=False, returnsorted=False)
+    corr2 = multitest.multipletests(mww_res, alpha=0.05, method='bonferroni', is_sorted=False, returnsorted=False)
     # returns: reject _array, pvals_corrected _array, alphacSidak _float, alphacBonf _float
 
     # Write statistics to CSV
@@ -264,12 +320,23 @@ def doStats(datalists):
         f.writerow("\n")
         f.writerow(anova)
         f.writerow("\n")
-        stringtemp = "Total twist wt vs oug: " + str(after9_ttest)
+        for substring in twist_normality_strings:
+            f.writerow([substring])
+        f.writerow("\n")
+        stringtemp = "Total twist wt vs oug: " + dl + str(after9_ttest)
         f.writerow([stringtemp])
         f.writerow("\n")
+        stringtemp = "Total twist wt vs oug: " + dl + str(after9_mww)
+        f.writerow([stringtemp])
+        f.writerow("\n")
+        f.writerow("\n")
+        for substring in angvel_normality_strings:
+            f.writerow([substring])
+        f.writerow("\n")
         f.writerow(["Angular velocity wt vs oug for each chamber: "])
-        for n, i, j in zip(names, corr[1], corr[0]):
-            string = n + dl + str(i) + dl + str(j)
+        f.writerow(["pair" + dl + "t-test" + dl + "p-value" + dl + "samples from same distribution?" + dl + "mww-rank-sum-test" + dl + "p-value" + dl + "samples from same distribution?"])
+        for n, i, j, k, l in zip(names, corr[1], corr[0], corr2[1], corr2[0]):
+            string = n + dl + "t-test" + dl + str(i) + dl + str(j) + dl + "mww-test" + dl + str(k) + dl + str(l)
             f.writerow([string])
         f.writerow("\n")
 
@@ -483,6 +550,42 @@ def plot_frames(df_all_data):
                     if time_idx != maxt:
                         ax.cla()
 
+###############################################################
+# Plot vectors from start to end using corrected coordinates. #
+###############################################################
+
+def plotStartEndVectors(df_all_data):
+    for expcond, df_data in df_all_data.items():
+        replicates = df_data['replicate'].unique()
+        for rep in replicates:
+            df = df_data.loc[df_data['replicate'] == rep]
+
+            # Plot: scatter point and plot axes
+            plt.style.use('dark_background')
+            plt.rcParams['grid.color'] = "dimgray"
+            fig = plt.figure()
+            fig.set_size_inches(32, 18) # set figure's size manually
+            ax = fig.add_subplot(1, 1, 1, projection='3d') # data translated and rotated
+
+            # Construct a color palette with unique colors for each TrackID
+            chambers = ['V', 'A', 'AVC']
+            palettes = ['flare', 'crest', 'Greys'] # matplotlib/seaborn palettes
+            cdict = {'TrackID' : [], 'color' : []}
+            for i in range(len(chambers)):
+                tracks_nunique = df.loc[df['Cat'] == chambers[i]]['TrackID'].nunique()
+                tracks_unique = df.loc[df['Cat'] == chambers[i]]['TrackID'].unique()
+                cp = sns.color_palette(palettes[i], tracks_nunique)
+                cdict['TrackID'].extend(tracks_unique)
+                cdict['color'].extend(cp)
+
+            color_df = pd.DataFrame.from_dict(cdict)
+            df = pd.merge(df, color_df, left_on='TrackID', right_on='TrackID')
+
+
+
+
+
+            
 ###############
 # Other plots #
 ###############
