@@ -638,27 +638,8 @@ def plotStartEndVectors(df_all_data):
             ax.set_ylim([-100,100])
             ax.set_zlim([-100,100])
 
-            # Transparent spines
-            ax.w_xaxis.line.set_color((0.5, 0.5, 0.5, 0.5))
-            ax.w_yaxis.line.set_color((0.5, 0.5, 0.5, 0.5))
-            ax.w_zaxis.line.set_color((0.5, 0.5, 0.5, 0.5))
-
-            # Transparent panes
-            ax.w_xaxis.set_pane_color((0.5, 0.5, 0.5, 0))
-            ax.w_yaxis.set_pane_color((0.5, 0.5, 0.5, 0))
-            ax.w_zaxis.set_pane_color((0.5, 0.5, 0.5, 0))
-
+            ax.set_axis_off()
             ax.view_init(elev=75., azim=300)  # "front" view with ventricle on top, atrium on bottom
-
-            # Font sizes
-            fontItems = [ax.title, ax.xaxis.label, ax.yaxis.label, ax.zaxis.label]
-            fontItems += ax.get_xticklabels() + ax.get_yticklabels() + ax.get_zticklabels()
-            try:
-                fontItems += ax.get_legend().get_texts()
-            except Exception: # no legend
-                pass
-            for item in fontItems:
-                item.set_fontsize(20)
 
             # Create an output directory if it doesn't exist and save figures there
             outputpath = Path("Output")
