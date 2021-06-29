@@ -12,16 +12,15 @@ import pandas as pd
 # statistical analysis
 from scipy.stats import ttest_ind
 from scipy import stats
-import statsmodels.stats.multicomp as multi
 import statsmodels.stats.multitest as multitest
 
 # plotting
 import matplotlib as mpl
 from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import mpl_toolkits.mplot3d.axes3d as p3
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d import proj3d
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import seaborn as sns
 
 # plotting options
@@ -93,6 +92,17 @@ def rm_rename_cats(df):
     df_out.drop(df_out[~(df_out['Cat'].isin(outputs))].index, inplace=True)
 
     return(df_out)
+
+# Get the row-wise vector magnitude
+def row_mag_groupby(group):
+    colnames = ['magnitude']
+    idx = group.index
+    v = group.to_numpy()
+    # Diagonal of array times its transpose = sum of squared elements of each row
+    v_mag = np.sqrt( np.diag( np.dot( v, v.T ) ) )
+
+    res = pd.DataFrame(v_mag, columns = colnames, index = idx)
+    return(res)
 
 ##########
 # LINFIT #
@@ -356,9 +366,9 @@ def doStats(datalists):
 ################
 
 # vector addition/subtraction for grouped dataframes
-def vec_add_groupby(group, v, df_twisttract = False):
+def vec_add_groupby(group, v, subtract = False):
     colnames = ['x+v', 'y+v', 'z+v']
-    if df_twisttract:
+    if subtract:
         v = -v
         colnames = ['x-v', 'y-v', 'z-v']
     idx = group.index
@@ -369,10 +379,10 @@ def vec_add_groupby(group, v, df_twisttract = False):
     return(res)
 
 # subtract first element on per-track basis
-def df_twist_init_xyz_df(group, cols, df_twisttract = True):
+def df_sub_init_xyz_df(group, cols, subtract = True):
     t_min = group['Time'].min()
     xyz_min = group.loc[ group['Time'] == t_min ][cols]
-    res = vec_add_groupby(group[cols], xyz_min, df_twisttract = df_twisttract)
+    res = vec_add_groupby(group[cols], xyz_min, subtract = subtract)
     return(res)
 
 def plot_frames(df_all_data):
@@ -390,22 +400,18 @@ def plot_frames(df_all_data):
             # Displacement trajectories 
             # t+1 - t
             dxyz_ori = ['dx_ori', 'dy_ori', 'dz_ori']
-            dxyz_trn = ['dx_trn', 'dy_trn', 'dz_trn']
             dxyz_rot = ['dx_rot', 'dy_rot', 'dz_rot']
 
             df = df.sort_values(by=['Time']) # Sort dataframe by time     
             df[dxyz_ori] = df.groupby(['TrackID'])[xyz].diff()
-            df[dxyz_trn] = df.groupby(['TrackID'])[xyzCC].diff()
             df[dxyz_rot] = df.groupby(['TrackID'])[xyzrot].diff()
 
             # t - t0
-            dxyz0_trn = ['dx0_trn', 'dy0_trn', 'dz0_trn']
-            dxyz0_rot = ['dx0_rot', 'dy0_rot', 'dz0_rot']
             dxyz0_ori = ['dx0_ori', 'dy0_ori', 'dz0_ori']
+            dxyz0_rot = ['dx0_rot', 'dy0_rot', 'dz0_rot']
             
-            df[dxyz0_ori] = df.groupby(['TrackID']).apply(df_twist_init_xyz_df, xyz, df_twisttract=True)
-            df[dxyz0_trn] = df.groupby(['TrackID']).apply(df_twist_init_xyz_df, xyzCC, df_twisttract=True)
-            df[dxyz0_rot] = df.groupby(['TrackID']).apply(df_twist_init_xyz_df, xyzrot, df_twisttract=True)
+            df[dxyz0_ori] = df.groupby(['TrackID']).apply(df_sub_init_xyz_df, xyz, subtract=True)
+            df[dxyz0_rot] = df.groupby(['TrackID']).apply(df_sub_init_xyz_df, xyzrot, subtract=True)
 
             # Get reference centroid for original coordinates to get axis limits
             mint = min(df['Time'].unique()) # first timepoint
@@ -445,7 +451,6 @@ def plot_frames(df_all_data):
             time_idx_list = []
             maxt = max(df['Time'])
             s = 50
-            size = np.linspace(0.1, s/3, df['Time'].nunique())
 
             grp = df.groupby(['Time'])
 
@@ -455,8 +460,6 @@ def plot_frames(df_all_data):
                 # To plot trajectories, get all timepoints up to the current one
                 time_idx_list.append(time_idx)
                 traj = df.loc[df['Time'].isin(time_idx_list)]
-                alphas = np.linspace(0.1, 0.75, len(time_idx_list))
-                lws = np.linspace(1, 15, len(time_idx_list))
 
                 for _, track in traj.groupby(['TrackID']):
                     color = track['color'].unique()[0]
@@ -474,15 +477,11 @@ def plot_frames(df_all_data):
 
                 # Plot displacement vectors
                 colnamelist = [ xyz, xyzrot ]
-                colxyz_d0 = [ dxyz0_ori , dxyz0_rot]
-
-                df_twist_cat = time_group[time_group['Cat'].isin(['V', 'A'])]
 
                 # Plot the axes using the centCC
                 centCC = time_group.groupby(['Cat']).mean().reset_index()
                 color_a = 'dodgerblue'
                 color_v = 'saddlebrown'
-                color_c = 'dimgray'
 
                 for col_idx, collist in enumerate(colnamelist):
 
@@ -554,38 +553,119 @@ def plot_frames(df_all_data):
 # Plot vectors from start to end using corrected coordinates. #
 ###############################################################
 
+# Matplotlib tools for drawing arrows in 3D (e.g. quiver) don't allow good control of arrowhead aesthetics.
+# As an alternative, we inherit the 2D FancyArrowPatch method and apply a 3D transform on it.
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, x, y, z, dx, dy, dz, *args, **kwargs):
+        super().__init__((0, 0), (0, 0), *args, **kwargs)
+        self._xyz = (x, y, z)
+        self._dxdydz = (dx, dy, dz)
+
+    def draw(self, renderer):
+        x1, y1, z1 = self._xyz
+        dx, dy, dz = self._dxdydz
+        x2, y2, z2 = (x1 + dx, y1 + dy, z1 + dz)
+
+        xs, ys, zs = proj3d.proj_transform((x1, x2), (y1, y2), (z1, z2), self.axes.M)
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+        super().draw(renderer)
+
 def plotStartEndVectors(df_all_data):
     for expcond, df_data in df_all_data.items():
         replicates = df_data['replicate'].unique()
         for rep in replicates:
             df = df_data.loc[df_data['replicate'] == rep]
 
-            # Plot: scatter point and plot axes
+            # Set up figure
             plt.style.use('dark_background')
             plt.rcParams['grid.color'] = "dimgray"
             fig = plt.figure()
-            fig.set_size_inches(32, 18) # set figure's size manually
-            ax = fig.add_subplot(1, 1, 1, projection='3d') # data translated and rotated
+            fig.set_size_inches(32, 18)
+            ax = fig.add_subplot(1, 1, 1, projection='3d')
 
             # Construct a color palette with unique colors for each TrackID
             chambers = ['V', 'A', 'AVC']
-            palettes = ['flare', 'crest', 'Greys'] # matplotlib/seaborn palettes
+            palettes = ['deeppink', 'cyan', 'gainsboro'] # matplotlib colors
             cdict = {'TrackID' : [], 'color' : []}
             for i in range(len(chambers)):
-                tracks_nunique = df.loc[df['Cat'] == chambers[i]]['TrackID'].nunique()
-                tracks_unique = df.loc[df['Cat'] == chambers[i]]['TrackID'].unique()
-                cp = sns.color_palette(palettes[i], tracks_nunique)
+                dfs = df.sort_values(by=['z_rot'], ascending=True) # sort to color by depth (regardless of WHEN the depth was reached)
+                tracks_nunique = dfs.loc[dfs['Cat'] == chambers[i]]['TrackID'].nunique()
+                tracks_unique = dfs.loc[dfs['Cat'] == chambers[i]]['TrackID'].unique()
+                cp = sns.dark_palette(palettes[i], tracks_nunique)
                 cdict['TrackID'].extend(tracks_unique)
                 cdict['color'].extend(cp)
 
             color_df = pd.DataFrame.from_dict(cdict)
             df = pd.merge(df, color_df, left_on='TrackID', right_on='TrackID')
 
+            # Subtract the first timepoint on a per-track basis to get displacement vector
+            # Note that each track may have its own min/max time in the time-lapse
+            xyzrot = ['x_rot', 'y_rot', 'z_rot'] # rotated coordinates
+            dxyz0_rot = ['dx0_rot', 'dy0_rot', 'dz0_rot']
+            df[dxyz0_rot] = df.groupby(['TrackID']).apply(df_sub_init_xyz_df, xyzrot, subtract=True)
 
+            for _, track in df.groupby(['TrackID']):
+                
+                mint = min(track['Time'].unique()) # first timepoint this track exists
+                maxt = max(track['Time'].unique()) # final timepoint this track exists
+                traj = track.loc[track['Time'].isin([mint, maxt])] 
 
+                magcol = traj.groupby(['TrackID'])[dxyz0_rot].apply(row_mag_groupby)
+                traj = traj.join(magcol)
 
+                color = traj['color'].unique()[0]
 
-            
+                first_xyz_loc = traj.loc[traj['Time'] == mint][xyzrot]
+                final_xyz_dir = traj.loc[traj['Time'] == maxt][dxyz0_rot]
+
+                startpoint = ( first_xyz_loc[xyzrot[0]].tolist()[0], first_xyz_loc[xyzrot[1]].tolist()[0], first_xyz_loc[xyzrot[2]].tolist()[0] )
+                vec = (final_xyz_dir[dxyz0_rot[0]].tolist()[0], final_xyz_dir[dxyz0_rot[1]].tolist()[0], final_xyz_dir[dxyz0_rot[2]].tolist()[0])
+                
+                a = Arrow3D(startpoint[0], # x
+                            startpoint[1], # y
+                            startpoint[2], # z
+                            vec[0], # dx
+                            vec[1], # dy
+                            vec[2], # dz
+                            mutation_scale=20, # Value with which attributes of arrowstyle (e.g., head_length) will be scaled.
+                            lw=3, 
+                            arrowstyle="-|>", 
+                            color=color)
+                ax.add_artist(a)
+
+            # Plot aesthetics
+            ax.set_xlim([-100,100])
+            ax.set_ylim([-100,100])
+            ax.set_zlim([-100,100])
+
+            # Transparent spines
+            ax.w_xaxis.line.set_color((0.5, 0.5, 0.5, 0.5))
+            ax.w_yaxis.line.set_color((0.5, 0.5, 0.5, 0.5))
+            ax.w_zaxis.line.set_color((0.5, 0.5, 0.5, 0.5))
+
+            # Transparent panes
+            ax.w_xaxis.set_pane_color((0.5, 0.5, 0.5, 0))
+            ax.w_yaxis.set_pane_color((0.5, 0.5, 0.5, 0))
+            ax.w_zaxis.set_pane_color((0.5, 0.5, 0.5, 0))
+
+            ax.view_init(elev=75., azim=300)  # "front" view with ventricle on top, atrium on bottom
+
+            # Font sizes
+            fontItems = [ax.title, ax.xaxis.label, ax.yaxis.label, ax.zaxis.label]
+            fontItems += ax.get_xticklabels() + ax.get_yticklabels() + ax.get_zticklabels()
+            try:
+                fontItems += ax.get_legend().get_texts()
+            except Exception: # no legend
+                pass
+            for item in fontItems:
+                item.set_fontsize(20)
+
+            # Create an output directory if it doesn't exist and save figures there
+            outputpath = Path("Output")
+            outputpath.mkdir(parents = True, exist_ok=True)
+            filestring = "vectors_start-end_" + rep + ".png"
+            fig.savefig(outputpath / filestring, bbox_inches='tight')
+
 ###############
 # Other plots #
 ###############
@@ -1171,7 +1251,7 @@ for ec_idx, ec in enumerate(exp_cond):
         seconds_per_step = unique_times[1] # 0th element t0 = 0.0, first element t1 = [time elapsed] - t0
         seconds_per_hour = 3600
 
-        df['time_hr'] = (df['Time']-1)*seconds_per_step/seconds_per_hour # df_twisttract 1 to start plots at t = 0
+        df['time_hr'] = (df['Time']-1)*seconds_per_step/seconds_per_hour # subtract 1 to start plots at t = 0
 
         # Drop the first "trimstart" timesteps from the analysis
         if trimstart > 0:
@@ -1211,11 +1291,11 @@ for ec_idx, ec in enumerate(exp_cond):
         tracks = 'TrackID'
         xyz = ['Position X','Position Y','Position Z'] # original coordinates
 
-        # coordinates after first translation: df_twisttracting AVC_0
+        # coordinates after first translation: subtract AVC_0
         xyzC = ['xC', 'yC', 'zC']
         avcC = ['avc_x', 'avc_y', 'avc_z']
 
-        # coordinates after second translation: df_twisttracting (AVC_t + AVC_0)
+        # coordinates after second translation: subtract (AVC_t + AVC_0)
         xyzCC = ['xCC', 'yCC', 'zCC'] 
         centCC = ['centx', 'centy', 'centz']
 
@@ -1615,11 +1695,13 @@ datalists = createDataSubsets(datalists)
 # Get statistics and make plots #
 #################################
 
+plotStartEndVectors(stabilized_data)
+
 doStats(datalists)
 makePlots(datalists)
 
 # Plot the result of translation + rotation side-by-side with original data
 if printmovies:
-    plot_frames(stabilized_data)
+   plot_frames(stabilized_data)
 
 #### END ####
